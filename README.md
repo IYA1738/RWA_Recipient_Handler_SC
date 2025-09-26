@@ -1,64 +1,62 @@
-📖 Overview
+# Recipient Handler Smart Contract
 
-RecipientHandler is a settlement and distribution smart contract that connects Buyers, Sellers, and the Platform.
-Key features:
+This repository contains the **RecipientHandler** smart contract.  
+It enables seller quoting, buyer payments with EIP-712 signatures, commission handling, and secure withdrawals.
 
-Buyers pay securely using EIP-712 signed orders
+---
 
-Sellers issue EIP-712 signed PriceQuotes to define prices and costs
+## ⚙️ Workflow Overview
 
-The platform automatically charges commission and distributes it via distributionSC
+### 1. Service Creation
+- Platform calls:
+  ```solidity
+  createService(serviceId, seller)
+Binds a service ID to a seller address.
 
-Sellers can safely withdraw their earnings
+2. Seller Quoting
+Seller issues and signs a PriceQuote (EIP-712).
 
-Supports Permit2 and EIP-2612 for gasless token approvals
+Seller can revoke or unrevoke quotes at any time.
 
-👥 Roles
+3. Buyer Payment
+Buyer signs an Order and calls:
 
-Owner (Platform)
+solidity
+复制代码
+payWithEIP712(order, buyerSig, quote, sellerQuoteSig, permitData)
+Contract verifies:
 
-Registers services (serviceId → seller)
+Buyer and seller signatures
 
-Manages the distribution contract (distributionSC)
+Quote validity
 
-Configures seller revenue share (sellerRate)
+Service binding (serviceId → seller)
 
-Can pause/unpause the contract
+Token allowance or permits (EIP-2612 / Permit2)
 
-Seller
+4. Settlement
+Buyer transfers tokens to the contract.
 
-Owns one or more serviceIds
+Profit split:
 
-Issues and signs PriceQuotes (with price, cost, expiry)
+Seller profit = (price - cost) * sellerRate / BPS
 
-Can revoke/unrevoke quotes
+Commission = (price - cost) - sellerProfit
 
-Can withdraw accumulated profits
+Commission is forwarded to distributionSC.
 
-Buyer
+5. Withdrawal
+Seller calls:
 
-Receives a seller’s PriceQuote
+solidity
+复制代码
+claim(token, amount)
+Withdraws accumulated profit in the chosen token.
 
-Creates and signs an Order (linked to quoteId)
-
-Calls payWithEIP712 to complete payment
-
-Distribution Contract
-
-Receives platform commission for further allocation (e.g., BBB, treasury, referral program)
-
-📂 Contract Structure
-contracts/
- ├─ RecipientHandler.sol        // Main contract
- ├─ interfaces/
- │   └─ IDistribution.sol       // Distribution interface
- └─ libraries/
-     ├─ Errors.sol              // Custom errors
-     ├─ Constants.sol           // Constants
-     └─ PermitHelper.sol        // Permit2 / EIP-2612 helpers
-
-📦 Data Structures
-Order (Buyer Order)
+📑 Data Structures
+Order
+solidity
+复制代码
 struct Order {
     address buyer;
     address payTo;
@@ -69,8 +67,9 @@ struct Order {
     uint128 serviceId;
     uint64 deadline;
 }
-
-PriceQuote (Seller Quote)
+PriceQuote
+solidity
+复制代码
 struct PriceQuote {
     bytes32 quoteId;
     address paymentToken;
@@ -80,131 +79,68 @@ struct PriceQuote {
     uint128 serviceId;
     uint64 expiry;
 }
+🔒 Security Features
+Replay Protection
+Uses OpenZeppelin Nonces with _useCheckedNonce.
 
-✍️ Signature Standards
-Seller Quote Signature (EIP-712)
+Reentrancy Guard
+lock modifier prevents nested calls.
 
-TypeHash
+Pausable
+Contract owner can pause/unpause in emergencies.
 
-PRICEQUOTE_TYPEHASH =
-  keccak256("PriceQuote(bytes32 quoteId,address paymentToken,address seller,uint256 price,uint256 cost,uint128 serviceId,uint64 expiry)");
+Access Control
+Currently Ownable, but can migrate to AccessControl.
 
+Strict Validation
 
-Example (ethers.js v6)
+Service ID must be registered.
 
-const domain = {
-  name: "RecipientHandler",
-  version: "1",
-  chainId,
-  verifyingContract: recipientHandlerAddress,
-};
+Buyer and seller signatures must match.
 
-const types = {
-  PriceQuote: [
-    { name: "quoteId", type: "bytes32" },
-    { name: "paymentToken", type: "address" },
-    { name: "seller", type: "address" },
-    { name: "price", type: "uint256" },
-    { name: "cost", type: "uint256" },
-    { name: "serviceId", type: "uint128" },
-    { name: "expiry", type: "uint64" },
-  ],
-};
+Revoked quotes cannot be used.
 
-const quote = {
-  quoteId,
-  paymentToken,
-  seller,
-  price: priceWei,
-  cost: costWei,
-  serviceId: 123,
-  expiry: Math.floor(Date.now() / 1000) + 86400, // +1 day
-};
+Zero addresses and zero amounts are rejected.
 
-const sellerQuoteSig = await seller.signTypedData(domain, types, quote);
+📊 Parameters
+sellerRate: percentage (in BPS) of net profit allocated to sellers.
 
-Buyer Order Signature (EIP-712)
+BPS: constant = 10,000 (basis points).
 
-TypeHash
+distributionSC: external contract handling commission distribution.
 
-ORDER_TYPEHASH =
-  keccak256("Order(address buyer,address payTo,address paymentToken,uint256 totalAmount,uint256 nonce,bytes32 quoteId,uint128 serviceId,uint64 deadline)");
+🔄 Example Flow
+Platform calls createService(101, sellerAddr).
 
+Seller issues and signs PriceQuote.
 
-Example
+Buyer signs Order and calls payWithEIP712(...).
 
-const types = {
-  Order: [
-    { name: "buyer", type: "address" },
-    { name: "payTo", type: "address" },
-    { name: "paymentToken", type: "address" },
-    { name: "totalAmount", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-    { name: "quoteId", type: "bytes32" },
-    { name: "serviceId", type: "uint128" },
-    { name: "deadline", type: "uint64" },
-  ],
-};
-
-const order = {
-  buyer,
-  payTo: recipientHandlerAddress,
-  paymentToken,
-  totalAmount: priceWei,
-  nonce: await recipientHandler.nextNonce(buyer),
-  quoteId,
-  serviceId: 123,
-  deadline: Math.floor(Date.now() / 1000) + 600, // +10 minutes
-};
-
-const buyerSig = await buyer.signTypedData(domain, types, order);
-
-⚡ Workflow
-
-Service Registration
-
-Platform calls createService(serviceId, seller)
-
-Seller Quoting
-
-Seller issues and signs PriceQuote
-
-Can revoke/unrevoke quotes
-
-Buyer Payment
-
-Buyer signs Order and calls payWithEIP712(order, buyerSig, quote, sellerQuoteSig, permitData)
-
-Contract verifies buyer and seller signatures, quote validity, service binding, and token authorization
+Contract validates signatures, transfers funds.
 
 Settlement
 
-Buyer transfers tokens to the contract
+Seller profit credited.
 
-Seller profit = (price - cost) * sellerRate / BPS
+Commission forwarded.
 
-Commission = (price - cost) - sellerProfit → sent to distributionSC
+Seller calls claim(token, amount) to withdraw profit.
 
-Withdrawal
+🚀 Development Notes
+Written in Solidity ^0.8.20
 
-Seller calls claim(token, amount) to withdraw accumulated profit
+Developed with Hardhat
 
+Tested with Foundry
 
-🔒 Security
+📝 To-Do / Future Improvements
+Migrate Ownable → AccessControl with roles:
 
-Replay protection: Nonces (_useCheckedNonce)
+ADMIN_ROLE
 
-Reentrancy guard: lock modifier
+SELLER_ROLE
 
-Pausable: Owner can pause in emergencies
+Add optional referrer support (commission split).
 
-Access control: Currently Ownable (could migrate to AccessControl)
+Enhance distributionSC with flexible allocation logic.
 
-Strict checks: ServiceId binding, seller verification, signature validation
-
-🚀 Future Improvements
-
-Replace Ownable with AccessControl for more granular roles
-
-
-📜 License: MIT
