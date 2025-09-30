@@ -57,7 +57,7 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
 
     address public distributionSC;  // SC refers to Smart Contract
 
-    uint256 public sellerRate;  // e.g. 9_000 = 90%
+    uint256 public commissionRate;  // e.g. 1_000 = 10%
     uint256 public constant BPS = 10_000;
 
 
@@ -168,9 +168,9 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         IERC20 token = IERC20(paymentToken);
         token.safeTransferFrom(buyer, address(this),amount);
 
-        uint256 sellerProfit = Math.mulDiv(amount, sellerRate, 10_000);
-        sellersProfit[seller][paymentToken] += sellerProfit;
-        uint256 commission = amount - sellerProfit;
+        uint256 netProfit =  amount - cost;
+        uint256 commission = Math.mulDiv(netProfit,  commissionRate, 10_000);
+        sellersProfit[seller][paymentToken] += (amount - commission);
         if(commission > 0){
             IERC20(paymentToken).safeTransfer(distributionSC, commission);
             IDistribution(distributionSC).distribute(commission, address(0));
@@ -250,11 +250,11 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         serviceActive[serviceId] = !serviceActive[serviceId];
     }
 
-    function setSellerRates(uint256 _sellerRate) external onlyOwner{
-        if(_sellerRate == 0 || _sellerRate > BPS){
+    function setCommissionRate(uint256 _commissionRate) external onlyOwner{
+        if(_commissionRate == 0 || _commissionRate > BPS){
             revert Errors.BadParas();
         }
-        sellerRate = _sellerRate;
+        commissionRate = _commissionRate;
     }
 
     function setDistributionSC(address _distributionSC) external onlyOwner{
@@ -299,7 +299,7 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
     function unpause() external onlyOwner{
         _unpause();
     }
-    constructor(string memory name, string memory version,address _distributionSC, uint256 _sellerRate) Ownable(msg.sender){
+    constructor(string memory name, string memory version,address _distributionSC, uint256 _commissionRate) Ownable(msg.sender){
         uint256 chainId;
         assembly{
             chainId := chainid()
@@ -318,10 +318,10 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
             revert Errors.ZeroAddress();
         }
         distributionSC = _distributionSC;
-        if(_sellerRate == 0 || _sellerRate > 10_000){
+        if(_commissionRate == 0 || _commissionRate > 10_000){
             revert Errors.BadParas();
         }
-        sellerRate = _sellerRate;
+        commissionRate = _commissionRate;
     }
     fallback() external payable{revert ("No ETH");}
 
