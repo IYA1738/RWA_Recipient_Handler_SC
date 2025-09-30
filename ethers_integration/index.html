@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RecipientHandler DApp - Complete Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+    h1 { border-bottom: 3px solid #007bff; padding-bottom: 5px; color: #333; }
+    h2 { margin-top: 30px; color: #555; }
+    .section { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    label { display: block; margin-top: 10px; font-weight: bold; color: #333; }
+    input, button, textarea { padding: 10px; margin-top: 5px; width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; }
+    button { cursor: pointer; background: #007bff; color: white; border: none; transition: background 0.3s; margin-bottom: 5px; }
+    button:hover { background: #0056b3; }
+    #connectBtn { background: #28a745; }
+    #connectBtn:hover { background: #1e7e34; }
+    #log { margin-top: 20px; padding: 15px; border: 1px solid #007bff; background: #e9f7ff; max-height: 400px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em; border-radius: 4px; }
+    .note { font-size: 0.8em; color: #6c757d; margin-top: 5px; }
+    .flex-row { display: flex; gap: 10px; }
+    .flex-row button { flex-grow: 1; }
+    hr { border: 0; height: 1px; background: #eee; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>RecipientHandler DApp</h1>
+  <button id="connectBtn">Connect Wallet</button>
+  <p id="wallet">Status: Not connected</p>
+
+  <p class="note">Contract Address: <span id="contractAddrDisplay">0xfc5B00Ab67CDd589c88E6eb7450d0806D5fcE1d9</span></p>
+
+  <hr>
+
+  <div class="section">
+    <h2>1. High-Level Payment (executeBuyerPayment) ✨</h2>
+    <p class="note">This calls `getNextNonce`, `createOrder`, `signOrder`, and `payWithEIP712` in one go.</p>
+    <label>PriceQuote Data (JSON)</label>
+    <input id="quoteJson" type="text" 
+           placeholder='{"quoteId":"0x...", "paymentToken":"0x...", "seller":"0x...", "price":"1000", "cost":"500", "serviceId":"1", "expiry":"1700000000"}'>
+    <label>SellerQuoteSig</label>
+    <input id="sellerQuoteSig" type="text" placeholder="0x... (The seller's signature)">
+    <button id="payBtn">Execute Buyer Payment</button>
+  </div>
+
+  <hr>
+
+  <div class="section">
+    <h2>2. Low-Level EIP-712 Flow (createOrder, signOrder, payWithEIP712) 🛠️</h2>
+    <p class="note">Test individual order generation and submission steps.</p>
+    
+    <label>Payment Token</label><input id="lowLevelToken" type="text" placeholder="0x...">
+    <label>Total Amount (wei)</label><input id="lowLevelAmount" type="text" placeholder="1000">
+    <label>Service ID</label><input id="lowLevelServiceId" type="text" placeholder="1">
+    <label>Quote ID (bytes32)</label><input id="lowLevelQuoteId" type="text" placeholder="0x...">
+
+    <button id="createOrderBtn">1. Create & Sign Order (Buyer)</button>
+
+    <label style="margin-top: 15px;">Signed Order JSON (Output)</label>
+    <textarea id="lowLevelOrderOutput" rows="3" readonly placeholder="Buyer's Order data"></textarea>
+
+    <label>Buyer Signature (Output)</label>
+    <input id="lowLevelSigOutput" type="text" readonly placeholder="Buyer's signature (sig)">
+
+    <hr>
+    
+    <label>PriceQuote Data (JSON from Seller)</label>
+    <input id="lowLevelQuoteInput" type="text" placeholder='{"quoteId":"0x...", "paymentToken":"0x...", "seller":"0x...", "price":"1000", ...}'>
+    <label>Seller Signature (sellerQuoteSig)</label>
+    <input id="lowLevelSellerSig" type="text" placeholder="0x...">
+
+    <button id="submitPayWithEIP712Btn">2. Submit payWithEIP712</button>
+  </div>
+
+  <hr>
+
+  <div class="section">
+    <h2>3. Claim, Revoke, Unrevoke (Seller Actions) 💸📜</h2>
+    <p class="note">Requires connected wallet to be the seller/authorized address.</p>
+
+    <h3 style="margin-top: 15px;">Claim Profit</h3>
+    <label>Token Address</label><input id="claimToken" type="text" placeholder="0x... (e.g., ERC20 token)">
+    <label>Amount to Claim</label><input id="claimAmount" type="text" placeholder="1000 (in smallest unit/wei)">
+    <button id="claimBtn">claim(token, amount)</button>
+    
+    <h3 style="margin-top: 15px;">Revoke/Unrevoke Quote</h3>
+    <label>PriceQuote Data (JSON)</label><input id="revokeQuoteJson" type="text" placeholder='{"quoteId":"0x...", "paymentToken":"0x...", ...}'>
+    <label>SellerQuoteSig</label><input id="revokeSellerSig" type="text" placeholder="0x... (Must be seller's signature)">
+    <div class="flex-row">
+        <button id="revokeBtn">revokeQuote</button>
+        <button id="unrevokeBtn">unrevokeQuote</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="section">
+    <h2>4. Service Management & Owner Actions ⚙️</h2>
+    <label>ServiceId</label><input id="serviceId" type="text" placeholder="1 (uint128)">
+    <label>Seller Address (for Create)</label><input id="serviceSeller" type="text" placeholder="0x... (Only required for Create)">
+    <button id="createServiceBtn">createService (Owner Only)</button>
+    <button id="setServiceActiveBtn">setServiceActive</button>
+  </div>
+  
+  <hr>
+
+  <div class="section">
+    <h2>5. Read Functions (View Calls) 🔎</h2>
+    <label>User Address</label><input id="userAddr" type="text" placeholder="0x... (e.g., connected address)">
+    <div class="flex-row">
+        <button id="nextNonceBtn">nextNonce()</button>
+        <button id="noncesBtn">nonces()</button>
+        <button id="commissionBtn">commissionRate()</button>
+    </div>
+    <label style="margin-top: 15px;">QuoteId (bytes32)</label><input id="revokedQuoteId" type="text" placeholder="0x... (e.g., from quoteJson)">
+    <button id="isRevokedBtn">isQuoteRevoked (revokedQuote)</button>
+  </div>
+
+  <hr>
+
+  <h2>Logs</h2>
+  <div id="log"></div>
+
+  <script type="module">
+    // NOTE: This assumes RecipientHandler.js is saved in the same directory
+    // and contains the class definition provided, with necessary BigInt/Ethers v6 fixes.
+    import { RecipientHandlerContract } from './RecipientHandler.js';
+
+    // --- Configuration ---
+    const CONTRACT_ADDRESS = "0xfc5B00Ab67CDd589c88E6eb7450d0806D5fcE1d9"; 
+    const rh = new RecipientHandlerContract(CONTRACT_ADDRESS);
+
+    // --- Logging Utility ---
+    const log = (msg, isError = false) => {
+      const logElement = document.getElementById("log");
+      const timestamp = new Date().toLocaleTimeString();
+      logElement.innerText = `[${timestamp}] ${isError ? 'ERROR: ' : ''}${msg}\n` + logElement.innerText;
+      if (isError) console.error(msg); else console.log(msg);
+    };
+
+    // --- Helper function to correctly parse JSON inputs with BigInts ---
+    // This is crucial for Ethers v6 and EIP-712 compatibility.
+    const parseQuoteData = (jsonString) => {
+        const data = JSON.parse(jsonString);
+        // Convert string inputs to BigInt for correct ethers handling of number types in EIP-712
+        data.price = BigInt(data.price);
+        data.cost = BigInt(data.cost);
+        data.serviceId = BigInt(data.serviceId);
+        data.expiry = BigInt(data.expiry);
+        return data;
+    };
+
+
+    // --- Event Listeners ---
+    
+    // Connect Wallet
+    document.getElementById("connectBtn").onclick = async () => {
+      try {
+        const { address } = await rh.connectWallet();
+        document.getElementById("wallet").innerText = `Status: Connected as ${address}`;
+        log("Wallet connected: " + address);
+      } catch (err) {
+        log(err.message, true);
+      }
+    };
+    
+    // 1. High-Level Payment (executeBuyerPayment)
+    document.getElementById("payBtn").onclick = async () => {
+      try {
+        const quoteData = parseQuoteData(document.getElementById("quoteJson").value);
+        const sellerSig = document.getElementById("sellerQuoteSig").value;
+
+        log("Attempting high-level payment (executeBuyerPayment)...");
+        const receipt = await rh.executeBuyerPayment(quoteData, sellerSig);
+        log(`Payment successful! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Payment Error: ${err.message}`, true);
+      }
+    };
+    
+    // 2. Low-Level: Create & Sign Order (createOrder, signOrder)
+    document.getElementById("createOrderBtn").onclick = async () => {
+        try {
+            const buyer = await rh.getConnectedAddress();
+            const token = document.getElementById("lowLevelToken").value;
+            const amount = document.getElementById("lowLevelAmount").value;
+            const serviceId = document.getElementById("lowLevelServiceId").value;
+            const quoteId = document.getElementById("lowLevelQuoteId").value;
+            
+            const nonce = await rh.getNextNonce(buyer);
+            const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600); 
+
+            // 1. Create Order
+            const order = rh.createOrder(
+                buyer,
+                token,
+                BigInt(amount), // totalAmount
+                nonce,
+                quoteId,
+                BigInt(serviceId), // serviceId
+                deadline
+            );
+
+            // 2. Sign Order (This is where MetaMask will open)
+            const sig = await rh.signOrder(order);
+
+            // Format BigInts back to string for display in JSON area
+            document.getElementById("lowLevelOrderOutput").value = JSON.stringify(order, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value, 2);
+            document.getElementById("lowLevelSigOutput").value = sig;
+
+            log("Order created and signed successfully (Signature copied to input field).");
+        } catch (err) {
+            log(`Create/Sign Order Error: ${err.message}`, true);
+        }
+    };
+
+    // 2. Low-Level: Submit PayWithEIP712 (payWithEIP712)
+    document.getElementById("submitPayWithEIP712Btn").onclick = async () => {
+        try {
+            // Get data from input fields
+            const orderJson = document.getElementById("lowLevelOrderOutput").value;
+            const orderSig = document.getElementById("lowLevelSigOutput").value;
+            const quoteJson = document.getElementById("lowLevelQuoteInput").value;
+            const sellerSig = document.getElementById("lowLevelSellerSig").value;
+
+            // Re-parse and convert strings back to BigInts before sending to contract
+            const order = JSON.parse(orderJson, (key, value) => 
+                 ['totalAmount', 'nonce', 'serviceId', 'deadline'].includes(key) ? BigInt(value) : value
+            );
+            const quoteData = parseQuoteData(quoteJson);
+
+            log("Submitting low-level payWithEIP712 transaction...");
+            const receipt = await rh.payWithEIP712(order, orderSig, quoteData, sellerSig);
+            log(`payWithEIP712 successful! Tx Hash: ${receipt.hash}`);
+
+        } catch (err) {
+            log(`payWithEIP712 Submission Error: ${err.message}`, true);
+        }
+    };
+
+    // 3. claim
+    document.getElementById("claimBtn").onclick = async () => {
+      try {
+        const token = document.getElementById("claimToken").value;
+        const amount = ethers.parseUnits(document.getElementById("claimAmount").value, 0); // Convert string to BigInt wei
+        log(`Claiming ${amount} of ${token}...`);
+        const receipt = await rh.claim(token, amount); 
+        log(`Claim successful! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Claim Error: ${err.message}`, true);
+      }
+    };
+    
+    // 3. revokeQuote
+    document.getElementById("revokeBtn").onclick = async () => {
+      try {
+        const quote = parseQuoteData(document.getElementById("revokeQuoteJson").value);
+        const sig = document.getElementById("revokeSellerSig").value;
+        log("Revoking quote...");
+        const receipt = await rh.revokeQuote(quote, sig);
+        log(`Revoke successful! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Revoke Error: ${err.message}`, true);
+      }
+    };
+    
+    // 3. unrevokeQuote
+    document.getElementById("unrevokeBtn").onclick = async () => {
+      try {
+        const quote = parseQuoteData(document.getElementById("revokeQuoteJson").value);
+        const sig = document.getElementById("revokeSellerSig").value;
+        log("Unrevoking quote...");
+        const receipt = await rh.unrevokeQuote(quote, sig);
+        log(`Unrevoke successful! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Unrevoke Error: ${err.message}`, true);
+      }
+    };
+
+    // 4. createService
+    document.getElementById("createServiceBtn").onclick = async () => {
+      try {
+        const sid = BigInt(document.getElementById("serviceId").value);
+        const seller = document.getElementById("serviceSeller").value;
+        log(`Creating service ${sid} for seller ${seller}...`);
+        
+        // This function isn't defined in the provided class, but we can call it directly on the contract if ABI is correct
+        if (!rh.contract) throw new Error("Wallet not connected for transaction.");
+        const tx = await rh.contract.createService(sid, seller);
+        const receipt = await tx.wait();
+
+        log(`Service created! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Create Service Error: ${err.message}`, true);
+      }
+    };
+    
+    // 4. setServiceActive
+    document.getElementById("setServiceActiveBtn").onclick = async () => {
+      try {
+        const sid = BigInt(document.getElementById("serviceId").value);
+        log(`Toggling service ${sid} active status...`);
+        // We call the class method which wraps the contract call
+        const receipt = await rh.setServiceActive(sid);
+        log(`Set active successful! Tx Hash: ${receipt.hash}`);
+      } catch (err) {
+        log(`Set Active Error: ${err.message}`, true);
+      }
+    };
+    
+    // 5. nextNonce
+    document.getElementById("nextNonceBtn").onclick = async () => {
+      try {
+        const addr = document.getElementById("userAddr").value || (rh.signer ? await rh.getConnectedAddress() : "0x0000...");
+        const nonce = await rh.getNextNonce(addr);
+        log(`Result of nextNonce(${addr}): ${nonce}`);
+      } catch (err) {
+        log(`nextNonce Error: ${err.message}`, true);
+      }
+    };
+    
+    // 5. nonces
+    document.getElementById("noncesBtn").onclick = async () => {
+      try {
+        const addr = document.getElementById("userAddr").value || (rh.signer ? await rh.getConnectedAddress() : "0x0000...");
+        
+        // nonces() is a direct view call, use readOnlyContract
+        if (!rh.readOnlyContract) await rh.initProvider();
+        const res = await rh.readOnlyContract.nonces(addr);
+        
+        log(`Result of nonces(${addr}): ${res}`);
+      } catch (err) {
+        log(`nonces Error: ${err.message}`, true);
+      }
+    };
+
+    // 5. commissionRate
+    document.getElementById("commissionBtn").onclick = async () => {
+      try {
+        const rate = await rh.getCommissionRate();
+        const percent = Number(rate) / 100; 
+        log(`Commission Rate: ${rate} BPS (${percent}%)`);
+      } catch (err) {
+        log(`commissionRate Error: ${err.message}`, true);
+      }
+    };
+    
+    // 5. revokedQuote (isQuoteRevoked)
+    document.getElementById("isRevokedBtn").onclick = async () => {
+      try {
+        const qid = document.getElementById("revokedQuoteId").value;
+        // isQuoteRevoked is the class method that calls revokedQuote(bytes32)
+        const res = await rh.isQuoteRevoked(qid);
+        log(`Quote ${qid} revoked status: ${res}`);
+      } catch (err) {
+        log(`isQuoteRevoked Error: ${err.message}`, true);
+      }
+    };
+    
+    // Initial check
+    rh.initProvider().then(() => log("Ethers Provider initialized (Read-only access ready).")).catch(err => log(`Provider Error: ${err.message}`, true));
+
+  </script>
+</body>
+</html>
