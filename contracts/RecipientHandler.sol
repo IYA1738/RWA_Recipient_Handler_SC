@@ -166,19 +166,15 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         }
         //serviceId ,amount and cost were verified by **payWithEIP712**
         IERC20 token = IERC20(paymentToken);
-        if(token.balanceOf(buyer) < amount){
-            revert Errors.InsufficientBal();
-        }
         token.safeTransferFrom(buyer, address(this),amount);
 
-        uint256 netProfit = amount - cost;
-        uint256 sellerProfit = Math.mulDiv(netProfit, sellerRate, BPS);
+        uint256 sellerProfit = Math.mulDiv(amount, sellerRate, 10_000);
         sellersProfit[seller][paymentToken] += sellerProfit;
-        uint256 commission = netProfit - sellerProfit;
+        uint256 commission = amount - sellerProfit;
         if(commission > 0){
-            IDistribution(distributionSC).distribute(commission,address(0));
+            IERC20(paymentToken).safeTransfer(distributionSC, commission);
+            IDistribution(distributionSC).distribute(commission, address(0));
         }
-
         emit UserPaid(buyer,seller,amount,serviceId);
     }
 
@@ -303,7 +299,7 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
     function unpause() external onlyOwner{
         _unpause();
     }
-    constructor(string memory name, string memory version,address _distributionSC) Ownable(msg.sender){
+    constructor(string memory name, string memory version,address _distributionSC, uint256 _sellerRate) Ownable(msg.sender){
         uint256 chainId;
         assembly{
             chainId := chainid()
@@ -322,6 +318,10 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
             revert Errors.ZeroAddress();
         }
         distributionSC = _distributionSC;
+        if(_sellerRate == 0 || _sellerRate > 10_000){
+            revert Errors.BadParas();
+        }
+        sellerRate = _sellerRate;
     }
     fallback() external payable{revert ("No ETH");}
 
