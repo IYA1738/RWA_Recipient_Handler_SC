@@ -275,8 +275,20 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         emit CreatedService(seller, serviceId);
     }
 
-    function nextNonce(address user) external view returns (uint256) {
+    function nextNonce(address user) external view returns(uint256) {
         return nonces(user); //  OZ Nonces
+    }
+
+    function getProfit(address caller,address token) external view returns(uint256){
+        return sellersProfit[caller][token];
+    }
+
+    function getSeller(uint128 serviceId) external view returns(address){
+        return serviceToSeller[serviceId];
+    }
+
+    function checkServiceActive(uint128 serviceId) external view returns(bool){
+        return serviceActive[serviceId];
     }
 
 

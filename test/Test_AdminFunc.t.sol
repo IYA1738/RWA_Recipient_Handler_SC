@@ -10,23 +10,25 @@ contract Test_AdminFunc is Test_Base ,Nonces{
     function test_setCommissionRate_ShouldSuccess_Fuzz(
         uint256 newCommissionRate
     ) public {
+        vm.startPrank(owner);
         vm.assume(newCommissionRate > 0);
         vm.assume(newCommissionRate <= BPS);
-        sc.setCommissionRate(newCommissionRate);
-        assertEq(sc.commissionRate(), newCommissionRate);
-    }
-
-    function test_setSellerRate_ShouldRevert_Fuzz(
-        uint256 newCommissionRate
-    ) public {
-        vm.startPrank(owner);
-        vm.assume(newCommissionRate >= BPS);
-        vm.expectRevert(Errors.BadParas.selector);
-        sc.setCommissionRate(newCommissionRate);
+        handler.setCommissionRate(newCommissionRate);
+        assertEq(handler.commissionRate(), newCommissionRate);
         vm.stopPrank();
     }
 
-    function test_setSellerRate_ShouldRevert_notOwner(address caller) public {
+    function test_setCommissionRate_ShouldRevert_Fuzz(
+        uint256 newCommissionRate
+    ) public {
+        vm.startPrank(owner);
+        vm.assume(newCommissionRate > BPS);
+        vm.expectRevert(Errors.BadParas.selector);
+        handler.setCommissionRate(newCommissionRate);
+        vm.stopPrank();
+    }
+
+    function test_setCommissionRate_ShouldRevert_notOwner(address caller) public {
         vm.assume(caller != owner && caller != address(0));
         vm.startPrank(caller);
         vm.expectRevert(
@@ -35,15 +37,15 @@ contract Test_AdminFunc is Test_Base ,Nonces{
                 caller
             )
         );
-        sc.setCommissionRate(1_000);
+        handler.setCommissionRate(1_000);
         vm.stopPrank();
     }
 
     function test_setDistributionSC_ShouldSuccess(address newSC) public {
         vm.assume(newSC != address(0));
         vm.startPrank(owner);
-        sc.setDistributionSC(newSC);
-        assertEq(sc.distributionSC(), newSC);
+        handler.setDistributionSC(newSC);
+        assertEq(handler.distributionSC(), newSC);
         vm.stopPrank();
     }
 
@@ -51,7 +53,7 @@ contract Test_AdminFunc is Test_Base ,Nonces{
         address newSC = address(0);
         vm.startPrank(owner);
         vm.expectRevert(Errors.ZeroAddress.selector);
-        sc.setDistributionSC(newSC);
+        handler.setDistributionSC(newSC);
         vm.stopPrank();
     }
 
@@ -66,18 +68,18 @@ contract Test_AdminFunc is Test_Base ,Nonces{
                 caller
             )
         );
-        sc.setDistributionSC(address(0x123abc));
+        handler.setDistributionSC(address(0x123abc));
         vm.stopPrank();
     }
 
     function test_pause_unpause_AsOwner() public {
         vm.startPrank(owner);
-        sc.pause();
-        assertTrue(sc.paused());
+        handler.pause();
+        assertTrue(handler.paused());
 
     
-        sc.unpause();
-        assertFalse(sc.paused());
+        handler.unpause();
+        assertFalse(handler.paused());
         vm.stopPrank();
     }
 
@@ -91,7 +93,7 @@ contract Test_AdminFunc is Test_Base ,Nonces{
                 caller
             )
         );
-        sc.pause();
+        handler.pause();
         vm.stopPrank();
     }
 
@@ -105,13 +107,33 @@ contract Test_AdminFunc is Test_Base ,Nonces{
                 caller
             )
         );
-        sc.unpause();
+        handler.unpause();
         vm.stopPrank();
     }
 
     function test_verifyNextNonce(address caller) public{
         vm.startPrank(caller);
-        assertEq(sc.nextNonce(caller),  nonces(user));
+        assertEq(handler.nextNonce(caller),  nonces(buyer));
+        vm.stopPrank();
+    }
+
+    function test_createService_ShouldSuccess(uint128 serviceId, address _seller) public{
+        vm.assume(_seller != address(0));
+        vm.startPrank(owner);
+        handler.createService(serviceId,_seller);
+        assertEq(handler.getSeller(serviceId),_seller);
+        vm.stopPrank();
+    }
+
+    function test_setServiceActive_ShouldSuccess(uint128 serviceId,address _seller) public{
+        vm.assume(_seller != address(0));
+        vm.startPrank(owner);
+        handler.createService(serviceId,_seller);
+        vm.stopPrank();
+        bool setBefore = handler.checkServiceActive(serviceId);
+        vm.startPrank(_seller);
+        handler.setServiceActive(serviceId);
+        assertEq(handler.checkServiceActive(serviceId), !setBefore);
         vm.stopPrank();
     }
 }
