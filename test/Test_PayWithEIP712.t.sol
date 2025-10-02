@@ -430,4 +430,766 @@ contract Test_PayWithEIP712 is Test, Nonces {
         );
         handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
     }
+
+    function test_payWithEIP712_RevertWith_InactiveService() public {
+        uint128 inactiveServiceId = 1002;
+        handler.createService(inactiveServiceId, seller);
+
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: inactiveServiceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: inactiveServiceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.InactivateService.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_QuoteIdMismatch() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: keccak256("mismatched-quote-id"),
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.BadParas.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_ServiceIdMismatch() public {
+        uint128 mismatchServiceId = 1002;
+        handler.createService(mismatchServiceId, seller);
+        vm.prank(seller);
+        handler.setServiceActive(mismatchServiceId);
+
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: mismatchServiceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.BadParas.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_PaymentTokenMismatch() public {
+        address mismatchedToken = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: mismatchedToken,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.BadParas.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_PriceMismatch() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price + 1,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.PriceMismatch.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_QuoteRevoked() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        vm.prank(seller);
+        handler.revokeQuote(q, sellerSig);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.QuoteRevoked.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_WrongCost_Zero() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: 0,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.WrongCost.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_WrongCost_GreaterOrEqual() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: price,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.WrongCost.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_NotBuyer() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory wrongBuyerSig = sign(orderDigest, sellerPk); // Sign with seller PK
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.NotBuyer.selector);
+        handler.payWithEIP712(o, wrongBuyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_NotSellerQuote() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory wrongSellerSig = sign(quoteDigest, buyerPk); // Sign with buyer PK
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.NotSeller.selector);
+        handler.payWithEIP712(o, buyerSig, q, wrongSellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_ServiceNotExists() public {
+        uint128 nonExistentServiceId = 999;
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: nonExistentServiceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: nonExistentServiceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.InactivateService.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_RecoveredSellerNotBoundSeller() public {
+        uint128 differentServiceId = 1002;
+        address differentSeller = makeAddr("differentSeller");
+        handler.createService(differentServiceId, differentSeller);
+        vm.prank(differentSeller);
+        handler.setServiceActive(differentServiceId);
+
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: USDC,
+            seller: seller, // Signed by seller, but bound to differentSeller
+            price: price,
+            cost: cost,
+            serviceId: differentServiceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: USDC,
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: differentServiceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert(Errors.NotSeller.selector);
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    function test_payWithEIP712_RevertWith_ZeroAddressPaymentToken() public {
+        RecipientHandler.PriceQuote memory q = RecipientHandler.PriceQuote({
+            quoteId: quoteId,
+            paymentToken: address(0),
+            seller: seller,
+            price: price,
+            cost: cost,
+            serviceId: serviceId,
+            expiry: nowTime + 365 days
+        });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
+        uint256 buyerNonce = handler.nextNonce(buyer);
+        RecipientHandler.Order memory o = RecipientHandler.Order({
+            buyer: buyer,
+            payTo: address(handler),
+            paymentToken: address(0),
+            totalAmount: price,
+            nonce: buyerNonce,
+            quoteId: quoteId,
+            serviceId: serviceId,
+            deadline: nowTime + 1 days
+        });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
+        vm.prank(buyer);
+        vm.expectRevert();
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
+    }
+
+    
 }

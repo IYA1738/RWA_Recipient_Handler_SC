@@ -82,7 +82,7 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         bytes calldata permit2Data)
     external 
     lock
-    whenNotPaused {
+    whenNotPaused { 
         uint64 deadline  = order.deadline;
         if(deadline < block.timestamp)      revert Errors.SigExpired();
         if(order.payTo != address(this))    revert Errors.NotPayTo();
