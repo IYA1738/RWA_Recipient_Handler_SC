@@ -1,0 +1,8 @@
+{
+    "importFilesToOrigRelpaths": {},
+    "primary_contract": "RecipientHandlerHarness",
+    "specfile": "/root/RWAInc-Projects/Recipient-Handler/certora/specs/RecipientHandler.spec",
+    "specfileOrigRelpath": "certora/specs/RecipientHandler.spec",
+    "specfilesToImportDecls": {},
+    "type": "spec"
+}

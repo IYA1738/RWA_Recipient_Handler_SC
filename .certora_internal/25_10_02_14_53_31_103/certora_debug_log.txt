@@ -1,0 +1,20 @@
+Saving last configuration file to .certora_internal/25_10_02_14_53_31_103/run.conf
+There is no TAC file. Going to script CertoraProver/certoraBuild.py to main_with_args()
+main build cache key computed based on {'files': ['certora/MockERC20.sol', 'certora/harness/RecipientHandlerHarness.sol'], 'package_version_for_build_cache': 'certora-cli 8.1.1', 'packages': ['@openzeppelin=node_modules/@openzeppelin'], 'packages_path': 'node_modules', 'solc': './solc_via_ir.sh', 'solc_allow_path': 'contracts', 'test_condition': 'True'}
+Creating dir /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_53_31_103/.certora_config
+In /root/RWAInc-Projects/Recipient-Handler/certora/specs/RecipientHandler.spec, found the imports: []
+copying spec file /root/RWAInc-Projects/Recipient-Handler/certora/specs/RecipientHandler.spec to /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_53_31_103/.certora_sources/.0_RecipientHandler.spec.spec
+writing /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_53_31_103/.certora_verify.json
+Local checks of CVL specification files disabled. It is recommended to enable the checks.
+`java` is not installed. Installing Java version 11 or later will enable faster CVL specification syntax checking before uploading to the cloud.
+Failed to get calls from spec
+Cannot run local checks because of missing a suitable java installation. To skip local checks run with the --disable_local_typechecking flag
+
+building file certora/MockERC20.sol
+Running cmd ./solc_via_ir.sh --version
+stdout, stderr = .certora_internal/25_10_02_14_53_31_103/.certora_config/version_check_solc_via_ir.sh.stdout, .certora_internal/25_10_02_14_53_31_103/.certora_config/version_check_solc_via_ir.sh.stderr
+Exitcode 0
+Solc run ./solc_via_ir.sh --version time: 0.1061
+Running cmd ./solc_via_ir.sh -o ".certora_internal/25_10_02_14_53_31_103/.certora_config/MockERC20.sol_0/" --overwrite --allow-paths "contracts",.,"node_modules/@openzeppelin" --standard-json
+stdout, stderr = .certora_internal/25_10_02_14_53_31_103/.certora_config/MockERC20.sol_0.standard.stdout.json, .certora_internal/25_10_02_14_53_31_103/.certora_config/MockERC20.sol_0.standard.stderr.json
+build failed

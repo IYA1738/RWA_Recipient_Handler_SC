@@ -1,0 +1,9 @@
+Saving last configuration file to .certora_internal/25_10_02_14_43_55_961/run.conf
+There is no TAC file. Going to script CertoraProver/certoraBuild.py to main_with_args()
+main build cache key computed based on {'files': ['certora/MockERC20.sol', 'certora/harness/RecipientHandlerHarness.sol'], 'package_version_for_build_cache': 'certora-cli 8.1.1', 'packages': ['@openzeppelin=node_modules/@openzeppelin/contracts'], 'packages_path': 'node_modules', 'solc': 'solc', 'solc_allow_path': 'contracts', 'test_condition': 'True'}
+Creating dir /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_43_55_961/.certora_config
+In /root/RWAInc-Projects/Recipient-Handler/certora/specs/RecipientHandler.spec, found the imports: []
+copying spec file /root/RWAInc-Projects/Recipient-Handler/certora/specs/RecipientHandler.spec to /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_43_55_961/.certora_sources/.0_RecipientHandler.spec.spec
+writing /root/RWAInc-Projects/Recipient-Handler/.certora_internal/25_10_02_14_43_55_961/.certora_verify.json
+`java` is not installed. Installing Java version 11 or later will enable faster CVL specification syntax checking before uploading to the cloud.
+build failed
