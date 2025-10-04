@@ -97,6 +97,9 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
         //At the same time, it was verified that the price is not 0
         if (quote.cost == 0 || quote.cost >= quote.price)     revert Errors.WrongCost();
         if (quote.expiry < block.timestamp)                   revert Errors.SigExpired();
+
+        //Check sigs
+        if(sig.length != 65 || sellerQuoteSig.length != 65) revert Errors.InvalidSig();
     
        _useCheckedNonce(order.buyer, order.nonce);
        bytes32 digest= _hashTypedDataV4(keccak256(
@@ -296,6 +299,7 @@ contract RecipientHandler is Pausable, Ownable, Nonces{
     /// @dev Use 1/2 instead of 0/1 to avoid expensive 0 ↔ non-0 SSTORE operations.
     ///      This ensures state changes are always non-0 ↔ non-0 (5000 gas) 
     ///      instead of 0 ↔ non-0 (21000 gas).
+    //需要更小粒度锁
     modifier lock {
         require(unlocked == 1,"Locked");
         unlocked = 2;

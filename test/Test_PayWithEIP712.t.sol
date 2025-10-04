@@ -347,6 +347,21 @@ contract Test_PayWithEIP712 is Test, Nonces {
             serviceId: serviceId,
             expiry: nowTime + 10 days
         });
+        bytes32 quoteStruct = keccak256(
+            abi.encode(
+                PRICEQUOTE_TYPEHASH,
+                q.quoteId,
+                q.paymentToken,
+                q.seller,
+                q.price,
+                q.cost,
+                q.serviceId,
+                q.expiry
+            )
+        );
+        bytes32 quoteDigest = hashTyped(quoteStruct);
+        bytes memory sellerSig = sign(quoteDigest, sellerPk);
+
         uint256 buyerNonce = handler.nextNonce(buyer);
         RecipientHandler.Order memory o = RecipientHandler.Order({
             buyer: buyer,
@@ -358,9 +373,25 @@ contract Test_PayWithEIP712 is Test, Nonces {
             serviceId: serviceId,
             deadline: nowTime + 1 days
         });
+        bytes32 orderStruct = keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                o.buyer,
+                o.payTo,
+                o.paymentToken,
+                o.totalAmount,
+                o.nonce,
+                o.quoteId,
+                o.serviceId,
+                o.deadline
+            )
+        );
+        bytes32 orderDigest = hashTyped(orderStruct);
+        bytes memory buyerSig = sign(orderDigest, buyerPk);
+
         o.payTo = _payTo;
         vm.expectRevert(Errors.NotPayTo.selector);
-        handler.payWithEIP712(o, bytes(""), q, bytes(""), bytes(""), bytes(""));
+        handler.payWithEIP712(o, buyerSig, q, sellerSig, bytes(""), bytes(""));
         vm.stopPrank();
     }
 

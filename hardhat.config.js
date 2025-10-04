@@ -11,6 +11,10 @@ module.exports = {
     },
   },
   networks: {
+    base:{
+      url: process.env.BASE_RPC_URL_INFURA,
+      accounts: [process.env.PRIV_KEY],
+    },
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts: [process.env.PRIVATE_KEY],
@@ -22,6 +26,7 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
+      base: process.env.ETHERSCAN_API_KEY,
       sepolia: process.env.ETHERSCAN_API_KEY,
       goerli: process.env.ETHERSCAN_API_KEY,
     },

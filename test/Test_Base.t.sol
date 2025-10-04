@@ -15,7 +15,7 @@ contract Test_Base is Test{
     string constant NAME = "Test";
     string constant VERSION = "1";
 
-    uint128 serviceId = 1001;
+    uint128 serviceId = uint128(uint256(keccak256(abi.encode(block.timestamp, block.number, msg.sender))));
     uint256 commissionRate = 1000; // 10%
     uint256 price = 1_000e6; // 1000 USDC
     uint256 cost = 100e6; // 100  USDC
